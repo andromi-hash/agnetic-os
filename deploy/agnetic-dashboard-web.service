@@ -1,0 +1,15 @@
+[Unit]
+Description=Agnetic OS Web Dashboard — HTTP server on port 8899
+After=agnetic-status-bridge.service
+Requires=agnetic-status-bridge.service
+PartOf=agnetic-dashboard.target
+
+[Service]
+Type=simple
+User=tech
+ExecStart=/home/tech/.hermes/hermes-agent/venv/bin/python3 /home/tech/agnetic-os/dashboard/server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=agnetic-dashboard.target

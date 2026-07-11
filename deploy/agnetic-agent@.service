@@ -1,0 +1,19 @@
+[Unit]
+Description=Agnetic OS Agent (%I)
+After=nats.service staragent.service
+Requires=nats.service
+PartOf=agnetic-agent-mesh.target
+
+[Service]
+Type=forking
+User=tech
+Environment=NATS_URL=nats://127.0.0.1:4222
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+ExecStart=/home/tech/agnetic-os/agents/run_agent.sh %i
+ExecStop=/bin/bash -c 'kill $(cat /home/tech/agnetic-os/agents/.%i.pid 2>/dev/null) 2>/dev/null || true'
+PIDFile=/home/tech/agnetic-os/agents/.%i.pid
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=agnetic-agent-mesh.target

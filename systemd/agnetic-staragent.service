@@ -1,0 +1,22 @@
+[Unit]
+Description=Agnetic Starship OS - StarAgent Telemetry Collector
+After=network.target agnetic-nats.service
+Requires=agnetic-nats.service
+
+[Service]
+Type=simple
+ExecStart=/opt/agnetic/bin/staragent
+Restart=always
+RestartSec=5
+User=agnetic
+Group=agnetic
+Environment=RUST_LOG=info
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/agnetic /tmp
+ProtectHome=true
+KillMode=mixed
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

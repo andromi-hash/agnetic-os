@@ -1,0 +1,31 @@
+# Proxy Agent (Tech)
+# Diagnostics, troubleshooting, system queries
+# Maps to OpenFrame's Mingo (tech AI)
+
+name: proxy
+role: tech_agent
+model: qwen2.5:7b
+provider: ollama
+
+capabilities:
+  - system_diagnostics
+  - log_analysis
+  - troubleshooting
+  - resource_monitoring
+  - process_management
+
+skills:
+  - system-health
+  - proxy-diagnostics
+
+toolsets:
+  - terminal
+  - file_operations
+  - web_search
+  - nats
+
+nats:
+  subjects:
+    command: "agnetic.agent.proxy.command.>"
+    event: "agnetic.agent.proxy.event.>"
+    status: "agnetic.agent.proxy.status"

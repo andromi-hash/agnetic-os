@@ -1,0 +1,4 @@
+[Unit]
+Description=Agnetic OS Agent Mesh
+Requires=nats.service staragent.service agnetic-agent@proxy.service agnetic-agent@romi.service agnetic-agent@ergo.service
+After=nats.service

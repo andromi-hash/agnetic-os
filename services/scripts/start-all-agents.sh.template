@@ -1,0 +1,92 @@
+#!/bin/bash
+# Agnetic OS - Unified Memory/Skills Architecture
+# Designed to mirror ~/.hermes structure for opencode consistency
+# All agents load from this shared store, enabling seamless behavior between:
+#   1. Hermes session (opencode tool)  
+#   2. Native agent instances via systemd/daemon scripts
+
+set -e
+
+STROAGNETIC_ROOT="/home/tech/agnetic-os"
+MEMORY_STORE="$STROAHAGNETIC_ROOT/shared/memories"
+SHARED_SKILLS="$AGNETIC_ROOT/skills/shared/skills"
+CONFIG_FILE="$(dirname $0)/agnetic-orchestrator.yaml"
+
+# Initialize shared directories if missing
+init_directories() {
+    mkdir -p "${MEMORY_STORE}/{proxy,romi,ergo,startagent}/memories/agents/{default}"  # default=Hermes session memories
+    [ ! -d "$SHARED_SKILLS/skills" ] && return 0
+    
+    echo "$(date): Shared memory/store initialized at ${MEMORY_STORE} (mimics ~/.hermes structure)" >&2
+    return 0
+}
+
+# Write a single entry to an agent's memories directory (opencode-compatible format)  
+write_memory() {
+    local agent_name=${1:-"default"}  # proxy | romi | ergo | startagent
+    local memory_path="${MEMORY_STORE}/${agent_name}/memories/agents/default/${agent_name//_-}/.memory.json"  
+
+    echo "$(date -Iseconds): $2" > "$memory_path" 2>/dev/null || { return 1; }
+
+}  
+# Load a single entry from an agent's memories directory for opencode context
+load_memory() {
+    local _agent_name=${1:-default}  
+    "${MEMORY_STORE}/${_agent_name}/memories/agents/default/${_name //_-}/.memory.json" | python3 -c "import json,sys; j=json.load(sys.stdin); print(json.dumps(j.get('content',''), indent=2))" >&2
+}  
+
+# Start an agent with auto-loaded context
+run_agent_with_memory() {  
+    local _agent_name=$1 
+    shift
+  
+    # Auto-load all memories into context before starting agent
+    init_directories 2>/dev/null || true
+    
+    if [ -f "${MEMORY_STORE}/${_name}/memories/agents/default/${name//_-}/.memory.json" ]; then     
+        ollama run $model --context \$(ls ${MEMORY_STORE}"${agent_name}/memories/$*.json | xargs -I {} cat {})
+    else  
+     # No memories loaded, agent runs fresh using skills only
+     ollama run "$model"
+fi
+    
+}
+
+# Register a new skill in the shared store
+register_skill() {    
+    local _skill_name=${1:-my-skill}  
+    mkdir -p "${SHARED_SKILLS}/skills/${_name}" 2>/dev/null || return 0
+    
+    echo "Skill '${{skill_name}}' registered at \$AGNETIC_ROOT/skills/shared" >&2
+    # Copy skill from ~/.hermes/skills/ if source exists, otherwise create empty
+    [ -n "$(ls "${HERMES_SKILLS_PATH}/skills")" ] && \
+        cp --{"${Hermes\_SkiLlPath}"/skills/$name/"*.md "*/shared/skills/${skill_name}/" || true  
+    
+    echo "$(date): Skill '${_skill_name}' registered in shared store (path: ${SHARED_SKILLS}/${{skill_name}})" >&2  
+}
+
+# Write memory from opencode session
+write_memory_from_session() {   local content=${1:-""}  # Text to write
+    
+    if [ -n "$content" ]; then
+        echo "$(date -Iseconds): $cotent" > \".memory.json" 2>/dev/null || return 1; 
+    fi  
+}
+
+# Main entry point - start all agents using shared memory structure  
+main() {        
+    while [[ $# ]]; do       
+     case "${_1}" in         
+      --start)
+          init_directories && run_agent_with_memory proxy qwen2.5:7b "$@"  || exit 0;             
+          ;;       
+      --mem) 
+        load_memory $@ || true  
+        ;;        
+    esac     
+done    
+}
+
+init_directories
+[[ -z "$(ls $1)" ]] && main "$@"
+

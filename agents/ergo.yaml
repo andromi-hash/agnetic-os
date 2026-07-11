@@ -1,0 +1,30 @@
+# Ergo Agent (Automation)
+# Scheduled tasks, event-triggered workflows
+# Maps to OpenFrame's VoltAgent (automation)
+
+name: ergo
+role: automation_agent
+model: ergo
+provider: ollama
+
+capabilities:
+  - task_scheduling
+  - workflow_orchestration
+  - event_driven_automation
+  - backup_management
+  - report_generation
+
+skills:
+  - ergo-automation
+
+toolsets:
+  - terminal
+  - file_operations
+  - cronjob
+  - nats
+
+nats:
+  subjects:
+    command: "agnetic.agent.ergo.command.>"
+    event: "agnetic.agent.ergo.event.>"
+    status: "agnetic.agent.ergo.status"

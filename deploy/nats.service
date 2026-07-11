@@ -1,0 +1,14 @@
+[Unit]
+Description=NATS Server for Agnetic OS Agent Bus
+After=network.target
+
+[Service]
+Type=simple
+User=tech
+ExecStart=/usr/sbin/nats-server -c /home/tech/agnetic-os/nats/agent-bus.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,40 @@
+# Agnetic OS NATS Subject Topology
+# Agent communication bus subjects
+
+subjects:
+  agent:
+    proxy:
+      command: "agnetic.agent.proxy.command.*"
+      event: "agnetic.agent.proxy.event.*"
+      status: "agnetic.agent.proxy.status"
+    romi:
+      command: "agnetic.agent.romi.command.*"
+      event: "agnetic.agent.romi.event.*"
+      status: "agnetic.agent.romi.status"
+    ergo:
+      command: "agnetic.agent.ergo.command.*"
+      event: "agnetic.agent.ergo.event.*"
+      status: "agnetic.agent.ergo.status"
+  telemetry:
+    cpu: "agnetic.telemetry.cpu"
+    mem: "agnetic.telemetry.mem"
+    disk: "agnetic.telemetry.disk"
+    net: "agnetic.telemetry.net"
+
+# Command types (used as wildcard *)
+commands:
+  - ping
+  - status
+  - report
+  - configure
+  - execute
+  - stop
+
+# Event types
+events:
+  - started
+  - stopped
+  - error
+  - warning
+  - completed
+  - heartbeat

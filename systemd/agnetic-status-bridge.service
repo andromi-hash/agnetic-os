@@ -1,0 +1,23 @@
+[Unit]
+Description=Agnetic Starship OS - Status Bridge
+After=network.target agnetic-nats.service
+Requires=agnetic-nats.service
+
+[Service]
+Type=simple
+ExecStart=/opt/agnetic/bin/agnetic-status.py
+Restart=always
+RestartSec=10
+User=agnetic
+Group=agnetic
+Environment=PYTHONPATH=/opt/agnetic/lib/agnetic
+WorkingDirectory=/opt/agnetic/lib/agnetic
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/agnetic /tmp
+ProtectHome=true
+KillMode=mixed
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

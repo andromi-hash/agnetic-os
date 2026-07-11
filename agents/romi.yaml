@@ -1,0 +1,32 @@
+# Romi Agent (Client)
+# User-facing interface, natural language interaction
+# Maps to OpenFrame's Fae (client AI)
+
+name: romi
+role: client_agent
+model: romi
+provider: ollama
+
+capabilities:
+  - natural_language_interface
+  - task_explanation
+  - status_reporting
+  - preference_management
+  - user_modeling
+
+skills:
+  - knowledge-store
+  - romi-interface
+
+toolsets:
+  - file_operations
+  - web_search
+  - memory
+  - skills
+  - nats
+
+nats:
+  subjects:
+    command: "agnetic.agent.romi.command.>"
+    event: "agnetic.agent.romi.event.>"
+    status: "agnetic.agent.romi.status"

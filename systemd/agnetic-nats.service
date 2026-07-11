@@ -1,0 +1,21 @@
+[Unit]
+Description=Agnetic Starship OS - NATS Message Bus
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nats-server -c /etc/agnetic/nats/agent-bus.conf
+Restart=always
+RestartSec=5
+User=nats
+Group=nats
+LimitNOFILE=65535
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/agnetic /var/log/agnetic
+ProtectHome=true
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

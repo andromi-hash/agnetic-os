@@ -1,0 +1,44 @@
+# Build artifacts
+target/
+*.o
+*.so
+*.dylib
+agneticctl/agneticctl
+agent/target/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Runtime files
+*.pid
+*.sock
+/tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets - NEVER commit
+*.key
+*.pem
+.env
+credentials/
+
+# NATS
+nats/nats-server.pid
+nats/nats-server.log
