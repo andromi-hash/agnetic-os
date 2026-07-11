@@ -2,6 +2,7 @@
 Description=Agnetic Starship OS - StarAgent Telemetry Collector
 After=network.target agnetic-nats.service
 Requires=agnetic-nats.service
+Documentation=https://github.com/andromi-hash/agnetic-os
 
 [Service]
 Type=simple
@@ -17,6 +18,9 @@ ReadWritePaths=/var/log/agnetic /tmp
 ProtectHome=true
 KillMode=mixed
 TimeoutStopSec=15
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Agnetic Starship OS - Agent Mesh (all services)
+After=network.target agnetic-nats.service
+Requires=agnetic-nats.service
+Wants=agnetic-staragent.service agnetic-agent@proxy.service agnetic-agent@romi.service agnetic-agent@ergo.service agnetic-status-bridge.service agnetic-message-history.service agnetic-dashboard.service
+Documentation=https://github.com/andromi-hash/agnetic-os
+
+[Install]
+WantedBy=multi-user.target

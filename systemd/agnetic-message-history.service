@@ -1,12 +1,12 @@
 [Unit]
-Description=Agnetic Starship OS - Status Bridge (NATS to JSON)
+Description=Agnetic Starship OS - Message History (NATS JetStream)
 After=network.target agnetic-nats.service
 Requires=agnetic-nats.service
 Documentation=https://github.com/andromi-hash/agnetic-os
 
 [Service]
 Type=simple
-ExecStart=/opt/agnetic/venv/bin/python3 /opt/agnetic/lib/agnetic/tray/agnetic-status.py
+ExecStart=/opt/agnetic/venv/bin/python3 /opt/agnetic/lib/agnetic/scripts/message_history.py
 Restart=always
 RestartSec=10
 User=agnetic
@@ -16,7 +16,7 @@ Environment=NATS_URL=nats://127.0.0.1:4222
 WorkingDirectory=/opt/agnetic/lib/agnetic
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/agnetic /tmp
+ReadWritePaths=/var/log/agnetic /var/lib/agnetic/message-history /tmp
 ProtectHome=true
 KillMode=mixed
 TimeoutStopSec=10

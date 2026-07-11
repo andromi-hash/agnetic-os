@@ -1,21 +1,28 @@
 [Unit]
 Description=Agnetic Starship OS - NATS Message Bus
 After=network.target
+Documentation=https://github.com/andromi-hash/agnetic-os
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/nats-server -c /etc/agnetic/nats/agent-bus.conf
+ExecReload=/bin/kill -s HUP $MAINPID
 Restart=always
-RestartSec=5
+RestartSec=3
 User=nats
 Group=nats
 LimitNOFILE=65535
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/agnetic /var/log/agnetic
+ReadWritePaths=/var/lib/agnetic/nats /var/log/agnetic
 ProtectHome=true
 KillMode=mixed
 TimeoutStopSec=30
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
 
 [Install]
 WantedBy=multi-user.target
