@@ -65,5 +65,9 @@ clean:
 	rm -rf agent/target
 	rm -rf __pycache__ agents/__pycache__ dashboard/__pycache__
 
+# ─── Debian package ──────────────────────────────────────────────────
+deb: build build-agent
+	@bash scripts/build-deb.sh
+
 docker:
 	docker build -t agnetic-os .

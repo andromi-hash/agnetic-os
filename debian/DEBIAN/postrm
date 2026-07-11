@@ -1,0 +1,36 @@
+#!/bin/bash
+# agnetic-os postrm — called after package files are removed
+set -e
+
+case "$1" in
+    remove|purge)
+        echo "Cleaning up Agnetic OS..."
+
+        # Remove systemd units
+        if command -v systemctl &>/dev/null; then
+            systemctl daemon-reload 2>/dev/null || true
+        fi
+
+        # Remove installed files
+        rm -rf /opt/agnetic
+        rm -rf /etc/agnetic
+        rm -rf /var/lib/agnetic
+        rm -rf /var/log/agnetic
+        rm -f /usr/local/bin/agneticctl
+
+        # Remove system users
+        userdel agnetic 2>/dev/null || true
+        userdel nats 2>/dev/null || true
+
+        echo "[OK] Cleanup complete"
+        ;;
+    upgrade)
+        echo "Upgrade in progress..."
+        ;;
+    failed-upgrade)
+        echo "Upgrade failed — previous version restored"
+        ;;
+    *)
+        echo "Unknown action: $1"
+        ;;
+esac

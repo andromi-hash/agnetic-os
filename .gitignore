@@ -5,6 +5,7 @@ target/
 *.dylib
 agneticctl/agneticctl
 agent/target/
+debian/installed/
 
 # Python
 __pycache__/

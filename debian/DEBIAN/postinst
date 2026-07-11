@@ -1,0 +1,98 @@
+#!/bin/bash
+# agnetic-os postinst — called after package files are extracted
+set -e
+
+echo "╔══════════════════════════════════════════════╗"
+echo "║  Agnetic Starship OS — Post-Install Setup   ║"
+echo "╚══════════════════════════════════════════════╝"
+echo ""
+
+# ─── 1. Create system users ─────────────────────────────────────────
+if ! id -u agnetic &>/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin \
+        --comment "Agnetic OS Service Account" agnetic
+    echo "[OK] Created user: agnetic"
+else
+    echo "[OK] User agnetic already exists"
+fi
+
+if ! id -u nats &>/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin \
+        --comment "NATS Message Bus" nats
+    echo "[OK] Created user: nats"
+else
+    echo "[OK] User nats already exists"
+fi
+
+# ─── 2. Create directories ─────────────────────────────────────────
+DIRS=(
+    /opt/agnetic/bin
+    /opt/agnetic/lib/agnetic/agents/skills
+    /opt/agnetic/lib/agnetic/dashboard
+    /opt/agnetic/lib/agnetic/tray
+    /opt/agnetic/lib/agnetic/scripts
+    /opt/agnetic/lib/agnetic/skills
+    /opt/agnetic/lib/agnetic/souls
+    /opt/agnetic/venv
+    /etc/agnetic/nats
+    /var/lib/agnetic/nats
+    /var/lib/agnetic/message-history
+    /var/log/agnetic
+)
+
+for d in "${DIRS[@]}"; do
+    mkdir -p "$d"
+done
+echo "[OK] Directories created"
+
+# ─── 3. Create Python venv ─────────────────────────────────────────
+if [[ ! -d /opt/agnetic/venv ]]; then
+    python3 -m venv /opt/agnetic/venv
+fi
+/opt/agnetic/venv/bin/pip install --upgrade pip -q 2>/dev/null
+/opt/agnetic/venv/bin/pip install nats-py aiohttp httpx PyYAML -q 2>/dev/null
+echo "[OK] Python venv ready"
+
+# ─── 4. Set permissions ────────────────────────────────────────────
+chown -R agnetic:agnetic /opt/agnetic
+chown -R agnetic:agnetic /etc/agnetic
+chown -R agnetic:agnetic /var/lib/agnetic
+chown -R agnetic:agnetic /var/log/agnetic
+chown -R nats:nats /var/lib/agnetic/nats
+chmod +x /opt/agnetic/bin/* 2>/dev/null || true
+echo "[OK] Permissions set"
+
+# ─── 5. Reload systemd ─────────────────────────────────────────────
+if command -v systemctl &>/dev/null; then
+    systemctl daemon-reload
+    echo "[OK] Systemd reloaded"
+fi
+
+# ─── 6. Enable services ────────────────────────────────────────────
+if command -v systemctl &>/dev/null; then
+    for unit in agnetic-nats agnetic-staragent agnetic-agent@proxy \
+                agnetic-agent@romi agnetic-agent@ergo agnetic-status-bridge \
+                agnetic-message-history agnetic-dashboard; do
+        systemctl enable "$unit.service" 2>/dev/null || true
+    done
+    echo "[OK] Services enabled"
+fi
+
+# ─── 7. GPU detection ──────────────────────────────────────────────
+if [[ -x /opt/agnetic/bin/detect-gpu.sh ]]; then
+    echo ""
+    echo "Running GPU detection..."
+    /opt/agnetic/bin/detect-gpu.sh detect 2>/dev/null || true
+    /opt/agnetic/bin/detect-gpu.sh configure 2>/dev/null || true
+fi
+
+# ─── 8. Done ────────────────────────────────────────────────────────
+echo ""
+echo "Installation complete!"
+echo ""
+echo "  Start:   systemctl start agnetic-mesh.target"
+echo "  Status:  systemctl status agnetic-mesh.target"
+echo "  Logs:    journalctl -u agnetic-* -f"
+echo "  CLI:     agneticctl --help"
+echo "  Dashboard: http://localhost:8899"
+echo ""

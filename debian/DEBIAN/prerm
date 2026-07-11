@@ -1,0 +1,15 @@
+#!/bin/bash
+# agnetic-os prerm — called before package files are removed
+set -e
+
+echo "Stopping Agnetic OS services..."
+
+if command -v systemctl &>/dev/null; then
+    for unit in agnetic-dashboard agnetic-message-history agnetic-status-bridge \
+                agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
+                agnetic-staragent agnetic-nats; do
+        systemctl stop "$unit.service" 2>/dev/null || true
+        systemctl disable "$unit.service" 2>/dev/null || true
+    done
+    echo "[OK] Services stopped and disabled"
+fi
