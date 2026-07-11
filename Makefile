@@ -69,5 +69,10 @@ clean:
 deb: build build-agent
 	@bash scripts/build-deb.sh
 
+# ─── ISO image ──────────────────────────────────────────────────────
+iso: build build-agent
+	@echo "Building ISO (requires root)..."
+	sudo bash scripts/build-iso.sh
+
 docker:
 	docker build -t agnetic-os .

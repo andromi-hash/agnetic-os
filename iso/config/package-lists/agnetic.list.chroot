@@ -1,0 +1,24 @@
+# Agnetic Starship OS — Live ISO Package List
+# Base system
+linux-generic
+ubuntu-standard
+build-essential
+curl
+wget
+git
+python3
+python3-pip
+python3-venv
+python3-aiohttp
+python3-yaml
+nats-server
+# GPU support
+nvidia-driver-570 | mesa-vulkan-drivers
+# Utilities
+htop
+tmux
+jq
+net-tools
+openssh-server
+# Desktop (minimal)
+ubuntu-desktop-minimal
