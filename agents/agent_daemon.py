@@ -64,6 +64,41 @@ async def query_ollama(model, prompt, system=None):
         return result.get("response", "")
 
 
+async def ensure_model(model):
+    """Check if Ollama model exists, pull if not."""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{OLLAMA_URL}/api/tags")
+            if resp.status_code == 200:
+                models = [m["name"] for m in resp.json().get("models", [])]
+                # Check both exact match and name:tag match
+                if model in models or any(m.startswith(model + ":") for m in models):
+                    log.info("Model '%s' already available", model)
+                    return True
+    except Exception as e:
+        log.warning("Failed to check Ollama models: %s", e)
+
+    # Model not found — pull it
+    log.info("Model '%s' not found — pulling from Ollama...", model)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ollama", "pull", model,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            log.info("Model '%s' pulled successfully", model)
+            return True
+        else:
+            log.error("Failed to pull model '%s': %s", model, stdout.decode()[-200:])
+            return False
+    except Exception as e:
+        log.error("Failed to pull model '%s': %s", model, e)
+        return False
+
+
 async def _consume_msgs(sub, handler):
     """Consume messages from a subscription and pass to handler."""
     try:
@@ -197,6 +232,9 @@ async def run_agent(agent_name, model_override=None):
     
     log.info("Starting agent '%s' (model=%s, nats=%s)", agent_name, model, NATS_URL)
     log.info("  Command subject: %s", cmd_subject)
+    
+    # Ensure model is available before connecting to NATS
+    await ensure_model(model)
     
     try:
         from nats import connect as nats_connect
