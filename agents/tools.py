@@ -13,6 +13,7 @@ import asyncio
 import logging
 import subprocess
 import shutil
+import shlex
 import signal
 from pathlib import Path
 from datetime import datetime
@@ -181,9 +182,21 @@ TOOLSETS = {
         "description": "Multi-agent task delegation",
         "tools": ["delegate_to_agent"],
     },
+    "coding": {
+        "description": "Code generation and OS expansion via OpenCode",
+        "tools": ["opencode"],
+    },
+    "design": {
+        "description": "Design artifact generation via Open Design",
+        "tools": ["opendesign"],
+    },
+    "expansion": {
+        "description": "Full OS expansion: coding + design",
+        "tools": ["opencode", "opendesign"],
+    },
     "full": {
         "description": "All available tools",
-        "includes": ["core", "network", "delegation"],
+        "includes": ["core", "network", "delegation", "coding", "design"],
     },
     "readonly": {
         "description": "Read-only operations (no writes, no shell)",
@@ -260,6 +273,149 @@ def repair_tool_arguments(args: Any, tool_name: str) -> dict:
 
     log.warning("Could not repair arguments for %s: %s", tool_name, str(args)[:100])
     return {}
+
+
+# ─── OpenCode Integration ──────────────────────────────────────────
+OPENCODE_BINARY = shutil.which("opencode") or "/tmp/opencode/bin/opencode"
+OPENCODE_TIMEOUT = 120
+
+
+def _tool_opencode_definition():
+    return {
+        "type": "function",
+        "function": {
+            "name": "opencode",
+            "description": "Invoke OpenCode AI coding agent for code generation, refactoring, debugging, or building new features. Agents can use this to expand and modify the OS from inside.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "The coding task or instruction for OpenCode"},
+                    "model": {"type": "string", "description": "Model in provider/model format (e.g. anthropic/claude-sonnet-4-20250514)"},
+                    "files": {"type": "array", "items": {"type": "string"}, "description": "File paths to attach as context"},
+                    "session": {"type": "string", "description": "Session ID to continue a previous conversation"},
+                    "continue_last": {"type": "boolean", "description": "Continue the last session"},
+                    "format": {"type": "string", "enum": ["default", "json"], "description": "Output format (default: json)"},
+                },
+                "required": ["prompt"],
+            },
+        },
+    }
+
+
+async def _tool_opencode(args: dict) -> dict:
+    """Invoke OpenCode for code generation and OS expansion."""
+    prompt = args.get("prompt", "")
+    model = args.get("model", "")
+    files = args.get("files", [])
+    session = args.get("session", "")
+    continue_last = args.get("continue_last", False)
+    fmt = args.get("format", "json")
+
+    if not prompt:
+        return {"error": True, "message": "prompt is required"}
+
+    if not Path(OPENCODE_BINARY).exists():
+        return {"error": True, "message": f"OpenCode not found at {OPENCODE_BINARY}. Install: curl -fsSL https://opencode.ai/install | bash"}
+
+    cmd_parts = [OPENCODE_BINARY, "run"]
+
+    if model:
+        cmd_parts.extend(["-m", model])
+    if fmt:
+        cmd_parts.extend(["--format", fmt])
+    if continue_last:
+        cmd_parts.append("-c")
+    if session:
+        cmd_parts.extend(["-s", session])
+    for f in files:
+        cmd_parts.extend(["-f", f])
+
+    cmd_parts.append(prompt)
+    command = " ".join(shlex.quote(p) for p in cmd_parts)
+
+    result = await _executor.execute(command, timeout=OPENCODE_TIMEOUT)
+    return result.to_dict()
+
+
+# ─── Open Design Integration ───────────────────────────────────────
+OPENDESIGN_DIR = Path(os.environ.get("OPENDESIGN_DIR", "/opt/open-design"))
+OPENDESIGN_DAEMON_PORT = 7456
+OPENDESIGN_TIMEOUT = 180
+
+
+def _tool_opendesign_definition():
+    return {
+        "type": "function",
+        "function": {
+            "name": "opendesign",
+            "description": "Generate design artifacts using Open Design — web prototypes, slide decks, mobile mockups, dashboards. Uses composable skills and brand-grade design systems.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "Description of what to design (e.g. 'landing page for agnetic os')"},
+                    "skill": {"type": "string", "description": "Open Design skill to use (e.g. 'web-prototype', 'slide-deck', 'dashboard', 'mobile-app')"},
+                    "design_system": {"type": "string", "description": "Design system name (e.g. 'linear', 'stripe', 'vercel', 'notion')"},
+                    "output_dir": {"type": "string", "description": "Directory to save artifacts (default: /tmp/agnetic-design)"},
+                    "agent": {"type": "string", "description": "Coding agent to use (e.g. opencode, hermes, claude)"},
+                },
+                "required": ["prompt"],
+            },
+        },
+    }
+
+
+async def _tool_opendesign(args: dict) -> dict:
+    """Generate design artifacts using Open Design."""
+    prompt = args.get("prompt", "")
+    skill = args.get("skill", "web-prototype")
+    design_system = args.get("design_system", "linear")
+    output_dir = args.get("output_dir", "/tmp/agnetic-design")
+    agent = args.get("agent", "opencode")
+
+    if not prompt:
+        return {"error": True, "message": "prompt is required"}
+
+    if not OPENDESIGN_DIR.exists():
+        return {"error": True, "message": f"Open Design not found at {OPENDESIGN_DIR}. Install: git clone https://github.com/nexu-io/open-design.git /opt/open-design"}
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    # Check if Open Design daemon is running
+    daemon_running = await _check_port(OPENDESIGN_DAEMON_PORT)
+
+    if daemon_running:
+        # Use daemon API
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(f"http://localhost:{OPENDESIGN_DAEMON_PORT}/api/generate", json={
+                    "prompt": prompt,
+                    "skill": skill,
+                    "design_system": design_system,
+                    "agent": agent,
+                    "output_dir": output_dir,
+                })
+                return {"status_code": resp.status_code, "output": resp.text, "error": resp.status_code >= 400}
+        except Exception as e:
+            return {"error": True, "message": f"Daemon API error: {e}"}
+    else:
+        # Use CLI fallback
+        cmd = f"cd {OPENDESIGN_DIR} && {agent} run \"Design a {skill} for: {prompt} using {design_system} design system. Output to {output_dir}\""
+        result = await _executor.execute(cmd, timeout=OPENDESIGN_TIMEOUT)
+        return result.to_dict()
+
+
+async def _check_port(port: int) -> bool:
+    """Check if a port is listening."""
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(("127.0.0.1", port))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
 
 
 # ─── Tool Definitions (Ollama function calling format) ──────────────
@@ -386,6 +542,8 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    _tool_opencode_definition(),
+    _tool_opendesign_definition(),
 ]
 
 
@@ -428,6 +586,10 @@ async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = 
             result = _tool_search_files(arguments)
         elif name == "delegate_to_agent":
             result = await _tool_delegate(nats, arguments)
+        elif name == "opencode":
+            result = await _tool_opencode(arguments)
+        elif name == "opendesign":
+            result = await _tool_opendesign(arguments)
         else:
             result = {"error": True, "message": f"Unknown tool: {name}"}
     except ToolError as e:
