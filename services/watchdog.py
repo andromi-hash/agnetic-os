@@ -34,7 +34,11 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 CONFIG_PATH = Path("/etc/agnetic/watchdog.yaml")
-LOG_DIR = Path("/var/log/agnetic")
+_log_dir = Path("/var/log/agnetic")
+if not os.access(_log_dir, os.W_OK):
+    _log_dir = Path("/tmp/agnetic-data/logs")
+_log_dir.mkdir(parents=True, exist_ok=True)
+LOG_DIR = _log_dir
 LOG_FILE = LOG_DIR / "watchdog.log"
 NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
 NATS_STATUS_SUBJECT = "agnetic.watchdog.status"

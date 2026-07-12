@@ -51,11 +51,26 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 CONFIG_PATH = Path("/etc/agnetic/webhooks.yaml")
-DB_DIR = Path("/var/lib/agnetic")
+
+_db_dir = Path("/var/lib/agnetic")
+if not os.access(_db_dir, os.W_OK):
+    _db_dir = Path("/tmp/agnetic-data")
+_db_dir.mkdir(parents=True, exist_ok=True)
+DB_DIR = _db_dir
 DB_PATH = DB_DIR / "webhooks.db"
-LOG_DIR = Path("/var/log/agnetic")
+
+_log_dir = Path("/var/log/agnetic")
+if not os.access(_log_dir, os.W_OK):
+    _log_dir = Path("/tmp/agnetic-data/logs")
+_log_dir.mkdir(parents=True, exist_ok=True)
+LOG_DIR = _log_dir
 LOG_FILE = LOG_DIR / "webhooks.log"
-PID_FILE = Path("/var/run/agnetic/webhooks.pid")
+
+_pid_dir = Path("/var/run/agnetic")
+if not os.access(_pid_dir, os.W_OK):
+    _pid_dir = Path("/tmp/agnetic-data")
+_pid_dir.mkdir(parents=True, exist_ok=True)
+PID_FILE = _pid_dir / "webhooks.pid"
 NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
 
 DEFAULT_CONFIG = {

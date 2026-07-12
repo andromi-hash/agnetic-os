@@ -44,7 +44,11 @@ SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = SCRIPT_DIR.parent
 CONFIG_PATH = PROJECT_ROOT / "services" / "cluster_config.yaml"
 SYSTEM_CONFIG_PATH = Path("/etc/agnetic/cluster.yaml")
-LOG_DIR = Path("/var/log/agnetic")
+_log_dir = Path("/var/log/agnetic")
+if not os.access(_log_dir, os.W_OK):
+    _log_dir = Path("/tmp/agnetic-data/logs")
+_log_dir.mkdir(parents=True, exist_ok=True)
+LOG_DIR = _log_dir
 LOG_FILE = LOG_DIR / "cluster.log"
 
 NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")

@@ -31,7 +31,11 @@ logging.basicConfig(
 log = logging.getLogger("log-aggregator")
 
 NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
-DB_DIR = Path("/var/lib/agnetic")
+_db_dir = Path("/var/lib/agnetic")
+if not os.access(_db_dir, os.W_OK):
+    _db_dir = Path("/tmp/agnetic-data")
+_db_dir.mkdir(parents=True, exist_ok=True)
+DB_DIR = _db_dir
 DB_PATH = DB_DIR / "logs.db"
 LOG_SOURCES = ["proxy", "romi", "ergo", "staragent", "dashboard", "nats", "watchdog"]
 

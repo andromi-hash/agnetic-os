@@ -49,7 +49,11 @@ except ImportError:
 
 CONFIG_PATH = Path("/etc/agnetic/marketplace.yaml")
 LOCAL_SKILLS_DIR = Path(os.getenv("AGNETIC_SKILLS_DIR", str(Path(__file__).resolve().parent.parent / "skills")))
-LOG_DIR = Path("/var/log/agnetic")
+_log_dir = Path("/var/log/agnetic")
+if not os.access(_log_dir, os.W_OK):
+    _log_dir = Path("/tmp/agnetic-data/logs")
+_log_dir.mkdir(parents=True, exist_ok=True)
+LOG_DIR = _log_dir
 LOG_FILE = LOG_DIR / "skill-scans.log"
 HISTORY_FILE = LOCAL_SKILLS_DIR / ".marketplace-history.json"
 
