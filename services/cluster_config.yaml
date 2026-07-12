@@ -1,0 +1,18 @@
+# Agnetic OS Cluster Configuration
+# Multi-node agent mesh settings
+
+cluster:
+  name: agnetic-mesh
+  heartbeat_interval: 30        # seconds between heartbeats
+  offline_threshold: 3          # missed heartbeats before marking offline
+
+node:
+  roles: [proxy, romi, ergo]    # agent roles this node can serve
+  capabilities:
+    gpu: auto-detect            # auto-detect | nvidia | amd | none
+    cpu_cores: auto             # auto-detect or override with integer
+    memory_mb: auto             # auto-detect or override with integer
+
+routing:
+  strategy: capability-based    # capability-based | round-robin | least-loaded
+  prefer_local: true            # prefer this node when capabilities are equal
