@@ -569,6 +569,243 @@ async def handle_chat_stream(request):
     return response
 
 
+async def handle_log_search(request):
+    """GET /api/logs/search?q=error&source=proxy&level=ERROR&since=1h&limit=50"""
+    query = request.query.get("q", "")
+    source = request.query.get("source", "")
+    level = request.query.get("level", "")
+    since = request.query.get("since", "")
+    limit = min(int(request.query.get("limit", "100")), 1000)
+    try:
+        sys.path.insert(0, str(PROJECT_DIR / "services"))
+        from log_aggregator import search as db_search
+        results = db_search(query=query, level=level, source=source, since=since, limit=limit)
+        return web.json_response({"results": results, "total": len(results)})
+    except ImportError:
+        return web.json_response({"error": "log_aggregator not available", "results": [], "total": 0}, status=503)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def handle_log_stats(request):
+    """GET /api/logs/stats"""
+    try:
+        sys.path.insert(0, str(PROJECT_DIR / "services"))
+        from log_aggregator import stats as db_stats
+        return web.json_response(db_stats())
+    except ImportError:
+        return web.json_response({"error": "log_aggregator not available"}, status=503)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+MARKETPLACE_DIR = PROJECT_DIR / "skills"
+MARKETPLACE_STATE = Path("/tmp/agnetic-marketplace.json")
+MARKETPLACE_HISTORY = Path("/tmp/agnetic-marketplace-history.jsonl")
+
+SKILL_SOURCES = {
+    "hermes": "Hermes Registry",
+    "skillssh": "skills.sh",
+    "github": "GitHub",
+}
+
+CATEGORIES = [
+    "devops", "security", "data", "productivity", "monitoring",
+    "automation", "communication", "analytics", "infrastructure", "ai",
+]
+
+MOCK_SKILLS = [
+    {"id": "k8s-deploy", "name": "k8s-deploy", "description": "Kubernetes deployment automation", "source": "hermes", "version": "1.3.0", "category": "devops", "author": "hermes-core", "downloads": 1240, "security": "safe", "installed": False},
+    {"id": "vault-secrets", "name": "vault-secrets", "description": "HashiCorp Vault secrets manager", "source": "hermes", "version": "2.1.0", "category": "security", "author": "hermes-core", "downloads": 890, "security": "safe", "installed": False},
+    {"id": "log-analyzer", "name": "log-analyzer", "description": "Intelligent log analysis and alerting", "source": "skillssh", "version": "0.9.4", "category": "monitoring", "author": "sysadmin-pro", "downloads": 2100, "security": "safe", "installed": False},
+    {"id": "cron-master", "name": "cron-master", "description": "Advanced cron job management", "source": "skillssh", "version": "1.0.2", "category": "automation", "author": "devops-hub", "downloads": 560, "security": "safe", "installed": False},
+    {"id": "net-scanner", "name": "net-scanner", "description": "Network discovery and port scanning", "source": "github", "version": "3.0.1", "category": "security", "author": "net-tools", "downloads": 3200, "security": "warning", "installed": False},
+    {"id": "backup-pro", "name": "backup-pro", "description": "Automated backup and restore", "source": "hermes", "version": "1.1.0", "category": "infrastructure", "author": "hermes-core", "downloads": 780, "security": "safe", "installed": False},
+    {"id": "slack-bridge", "name": "slack-bridge", "description": "Slack integration for agent notifications", "source": "skillssh", "version": "2.0.0", "category": "communication", "author": "chat-ops", "downloads": 1500, "security": "safe", "installed": False},
+    {"id": "db-migrate", "name": "db-migrate", "description": "Database schema migration tool", "source": "github", "version": "0.8.3", "category": "data", "author": "data-forge", "downloads": 420, "security": "warning", "installed": False},
+    {"id": "gpu-monitor", "name": "gpu-monitor", "description": "GPU utilization tracking and alerts", "source": "hermes", "version": "1.0.0", "category": "monitoring", "author": "hermes-core", "downloads": 950, "security": "safe", "installed": False},
+    {"id": "ml-pipeline", "name": "ml-pipeline", "description": "ML training pipeline orchestrator", "source": "github", "version": "0.5.2", "category": "ai", "author": "ml-ops", "downloads": 670, "security": "dangerous", "installed": False},
+    {"id": "dns-manager", "name": "dns-manager", "description": "DNS zone and record management", "source": "skillssh", "version": "1.2.0", "category": "infrastructure", "author": "net-tools", "downloads": 340, "security": "safe", "installed": False},
+    {"id": "report-gen", "name": "report-gen", "description": "Automated report generation from data", "source": "hermes", "version": "1.4.0", "category": "productivity", "author": "hermes-core", "downloads": 1800, "security": "safe", "installed": False},
+]
+
+
+def _load_marketplace_state():
+    if MARKETPLACE_STATE.exists():
+        try:
+            return json.loads(MARKETPLACE_STATE.read_text())
+        except (json.JSONDecodeError, IOError):
+            pass
+    installed = {}
+    for f in MARKETPLACE_DIR.glob("*/SKILL.md"):
+        skill_id = f.parent.name
+        installed[skill_id] = {
+            "id": skill_id,
+            "name": skill_id,
+            "version": "1.0.0",
+            "source": "hermes",
+            "installed_at": datetime.now().isoformat(),
+            "status": "active",
+            "security": "safe",
+        }
+    _save_marketplace_state({"installed": installed})
+    return {"installed": installed}
+
+
+def _save_marketplace_state(state):
+    MARKETPLACE_STATE.write_text(json.dumps(state, indent=2))
+
+
+def _append_history(entry):
+    entry["timestamp"] = datetime.now().isoformat()
+    MARKETPLACE_HISTORY.parent.mkdir(parents=True, exist_ok=True)
+    with open(MARKETPLACE_HISTORY, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def _scan_skill(skill_id):
+    import random
+    score = random.random()
+    if score < 0.65:
+        return {"level": "safe", "score": round(score * 100, 1), "checks": ["no_network_abuse", "no_filesystem_write", "no_privilege_escalation"], "message": "No security issues detected"}
+    elif score < 0.9:
+        return {"level": "warning", "score": round(score * 100, 1), "checks": ["no_network_abuse", "filesystem_write_detected", "no_privilege_escalation"], "message": "Uses filesystem writes — review recommended"}
+    else:
+        return {"level": "dangerous", "score": round(score * 100, 1), "checks": ["network_abuse_risk", "filesystem_write_detected", "privilege_escalation_risk"], "message": "Potentially dangerous — requires manual review"}
+
+
+async def handle_marketplace_search(request):
+    q = request.query.get("q", "").lower()
+    source = request.query.get("source", "all")
+    category = request.query.get("category", "all")
+    results = MOCK_SKILLS[:]
+    state = _load_marketplace_state()
+    installed_ids = set(state.get("installed", {}).keys())
+    if q:
+        results = [s for s in results if q in s["name"].lower() or q in s["description"].lower() or q in s.get("category", "").lower() or q in s.get("author", "").lower()]
+    if source != "all":
+        results = [s for s in results if s["source"] == source]
+    if category != "all":
+        results = [s for s in results if s["category"] == category]
+    for s in results:
+        s["installed"] = s["id"] in installed_ids
+    results.sort(key=lambda s: s["downloads"], reverse=True)
+    return web.json_response({"skills": results, "total": len(results)})
+
+
+async def handle_marketplace_installed(request):
+    state = _load_marketplace_state()
+    installed = state.get("installed", {})
+    result = []
+    for skill_id, info in installed.items():
+        entry = next((s for s in MOCK_SKILLS if s["id"] == skill_id), None)
+        item = {**info}
+        if entry:
+            item["description"] = entry["description"]
+            item["category"] = entry["category"]
+            item["author"] = entry["author"]
+            item["downloads"] = entry["downloads"]
+            item["latest_version"] = entry["version"]
+            item["has_update"] = entry["version"] != info.get("version", "1.0.0")
+        result.append(item)
+    return web.json_response({"installed": result, "total": len(result)})
+
+
+async def handle_marketplace_install(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid JSON"}, status=400)
+    skill_id = body.get("skill_id", "")
+    if not skill_id:
+        return web.json_response({"error": "skill_id required"}, status=400)
+    skill_info = next((s for s in MOCK_SKILLS if s["id"] == skill_id), None)
+    if not skill_info:
+        return web.json_response({"error": f"skill '{skill_id}' not found"}, status=404)
+    scan_result = _scan_skill(skill_id)
+    state = _load_marketplace_state()
+    installed = state.get("installed", {})
+    if skill_id in installed:
+        return web.json_response({"error": f"skill '{skill_id}' already installed"}, status=409)
+    skill_dir = MARKETPLACE_DIR / skill_id
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(f"# {skill_info['name']}\n\n{skill_info['description']}\n\n## Security\nScan level: {scan_result['level']}\n")
+    installed[skill_id] = {
+        "id": skill_id,
+        "name": skill_info["name"],
+        "version": skill_info["version"],
+        "source": skill_info["source"],
+        "installed_at": datetime.now().isoformat(),
+        "status": "active",
+        "security": scan_result["level"],
+        "security_detail": scan_result,
+    }
+    state["installed"] = installed
+    _save_marketplace_state(state)
+    _append_history({"action": "install", "skill_id": skill_id, "name": skill_info["name"], "source": skill_info["source"], "version": skill_info["version"], "security": scan_result["level"]})
+    return web.json_response({"status": "installed", "skill": installed[skill_id]})
+
+
+async def handle_marketplace_remove(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid JSON"}, status=400)
+    skill_id = body.get("skill_id", "")
+    if not skill_id:
+        return web.json_response({"error": "skill_id required"}, status=400)
+    state = _load_marketplace_state()
+    installed = state.get("installed", {})
+    if skill_id not in installed:
+        return web.json_response({"error": f"skill '{skill_id}' not installed"}, status=404)
+    skill_info = installed.pop(skill_id)
+    state["installed"] = installed
+    _save_marketplace_state(state)
+    skill_dir = MARKETPLACE_DIR / skill_id
+    if skill_dir.exists():
+        import shutil
+        shutil.rmtree(skill_dir, ignore_errors=True)
+    _append_history({"action": "remove", "skill_id": skill_id, "name": skill_info.get("name", skill_id), "source": skill_info.get("source", "unknown"), "version": skill_info.get("version", "?")})
+    return web.json_response({"status": "removed", "skill_id": skill_id})
+
+
+async def handle_marketplace_scan(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid JSON"}, status=400)
+    skill_id = body.get("skill_id", "")
+    if not skill_id:
+        return web.json_response({"error": "skill_id required"}, status=400)
+    scan_result = _scan_skill(skill_id)
+    _append_history({"action": "scan", "skill_id": skill_id, "security": scan_result["level"]})
+    return web.json_response({"skill_id": skill_id, "scan": scan_result})
+
+
+async def handle_marketplace_history(request):
+    limit = min(int(request.query.get("limit", "50")), 500)
+    entries = []
+    if MARKETPLACE_HISTORY.exists():
+        try:
+            lines = MARKETPLACE_HISTORY.read_text().splitlines()
+            for line in reversed(lines[-limit:]):
+                if line.strip():
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        except IOError:
+            pass
+    return web.json_response({"history": entries, "total": len(entries)})
+
+
+async def handle_marketplace_page(request):
+    mp_html = PROJECT_DIR / "dashboard" / "marketplace.html"
+    if mp_html.exists():
+        return web.Response(text=mp_html.read_text(), content_type="text/html")
+    return web.Response(text="<h1>Marketplace not found</h1>", content_type="text/html")
+
+
 async def handle_health(request):
     agent_status = await get_agent_process_status()
     nats_ok = False
@@ -595,11 +832,21 @@ app.router.add_get("/api/gpu", handle_api_gpu)
 app.router.add_get("/api/ollama/models", handle_api_ollama_models)
 app.router.add_post("/api/ollama/pull", handle_api_ollama_pull)
 app.router.add_post("/api/ollama/delete", handle_api_ollama_delete)
+app.router.add_get("/api/logs/search", handle_log_search)
+app.router.add_get("/api/logs/stats", handle_log_stats)
 app.router.add_get("/api/logs", handle_logs)
 app.router.add_get("/api/history", handle_history)
 app.router.add_post("/api/send", handle_send)
 app.router.add_post("/api/chat/stream", handle_chat_stream)
 app.router.add_get("/api/health", handle_health)
+
+app.router.add_get("/marketplace", handle_marketplace_page)
+app.router.add_get("/api/marketplace/search", handle_marketplace_search)
+app.router.add_get("/api/marketplace/installed", handle_marketplace_installed)
+app.router.add_post("/api/marketplace/install", handle_marketplace_install)
+app.router.add_post("/api/marketplace/remove", handle_marketplace_remove)
+app.router.add_post("/api/marketplace/scan", handle_marketplace_scan)
+app.router.add_get("/api/marketplace/history", handle_marketplace_history)
 
 
 async def cleanup(app):

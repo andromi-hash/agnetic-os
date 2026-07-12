@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agnetic OS — Marketplace</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --color-bg:#070B14;
+  --color-surface:rgba(14,22,40,0.72);
+  --color-glass:rgba(14,22,40,0.55);
+  --color-glass-edge:rgba(60,80,120,0.15);
+  --color-primary:#7BC8E4;
+  --color-accent:#C4A97D;
+  --color-text:#E4DDD0;
+  --color-text-dim:#8A9BB0;
+  --color-text-muted:#5A6A80;
+  --color-success:#7BC8A4;
+  --color-warning:#D4A060;
+  --color-alert:#D46060;
+  --radius:12px;
+  --radius-sm:8px;
+}
+html{font-size:14px}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--color-bg);
+  color:var(--color-text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+code,pre,.mono{font-family:'JetBrains Mono',monospace}
+
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(ellipse at 20% 50%,rgba(30,60,114,0.15),transparent 60%),
+    radial-gradient(ellipse at 80% 20%,rgba(100,60,30,0.08),transparent 50%),
+    radial-gradient(ellipse at 50% 80%,rgba(20,80,60,0.06),transparent 50%);
+}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--color-glass-edge);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--color-text-muted)}
+
+.glass{
+  background:var(--color-surface);
+  border:1px solid var(--color-glass-edge);
+  border-radius:var(--radius);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+}
+.glass-sub{
+  background:var(--color-glass);
+  border:1px solid var(--color-glass-edge);
+  border-radius:var(--radius-sm);
+}
+
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 20px;
+  background:var(--color-surface);
+  border-bottom:1px solid var(--color-glass-edge);
+  backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:100;
+}
+#topbar .left,#topbar .right{display:flex;align-items:center;gap:12px}
+.ship-name{font-weight:600;font-size:1.1rem;color:var(--color-primary);letter-spacing:0.5px}
+.nav-link{
+  padding:5px 12px;border-radius:20px;
+  border:1px solid var(--color-glass-edge);
+  background:var(--color-glass);
+  color:var(--color-text-dim);
+  font-size:0.75rem;font-family:inherit;
+  cursor:pointer;transition:all 0.2s;text-decoration:none;
+}
+.nav-link:hover,.nav-link.active{
+  background:rgba(123,200,228,0.12);
+  color:var(--color-primary);
+  border-color:rgba(123,200,228,0.3);
+}
+.clock{font-family:'JetBrains Mono',monospace;color:var(--color-text-dim);font-size:0.9rem}
+
+#main{display:flex;flex-direction:column;padding:16px 20px;gap:16px;max-width:1400px;margin:0 auto;width:100%}
+
+.search-bar{display:flex;gap:8px;align-items:stretch}
+.search-input{
+  flex:1;
+  background:var(--color-glass);
+  border:1px solid var(--color-glass-edge);
+  color:var(--color-text);
+  padding:10px 14px;
+  border-radius:var(--radius-sm);
+  font-size:0.9rem;
+  font-family:inherit;
+  outline:none;
+  transition:border-color 0.2s;
+}
+.search-input:focus{border-color:var(--color-primary)}
+.search-input::placeholder{color:var(--color-text-muted)}
+.search-select{
+  background:var(--color-glass);
+  border:1px solid var(--color-glass-edge);
+  color:var(--color-text);
+  padding:10px 12px;
+  border-radius:var(--radius-sm);
+  font-size:0.8rem;
+  font-family:inherit;
+  min-width:130px;
+}
+.search-select option{background:#0E1628;color:var(--color-text)}
+.search-btn{
+  padding:10px 20px;
+  border-radius:var(--radius-sm);
+  border:1px solid rgba(123,200,228,0.3);
+  background:rgba(123,200,228,0.12);
+  color:var(--color-primary);
+  font-size:0.85rem;font-weight:600;font-family:inherit;
+  cursor:pointer;transition:all 0.2s;
+}
+.search-btn:hover{background:rgba(123,200,228,0.22)}
+
+.section-label{
+  font-size:0.7rem;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--color-text-muted);
+  font-weight:600;
+}
+
+.categories{display:flex;flex-wrap:wrap;gap:6px}
+.cat-btn{
+  padding:5px 14px;border-radius:20px;
+  border:1px solid var(--color-glass-edge);
+  background:var(--color-glass);
+  color:var(--color-text-dim);
+  font-size:0.7rem;font-family:inherit;
+  cursor:pointer;transition:all 0.2s;
+}
+.cat-btn:hover{background:rgba(123,200,228,0.1);color:var(--color-primary);border-color:rgba(123,200,228,0.2)}
+.cat-btn.active{background:rgba(123,200,228,0.15);color:var(--color-primary);border-color:rgba(123,200,228,0.35)}
+
+.results-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:12px;
+}
+.skill-card{
+  padding:16px;
+  border-radius:var(--radius);
+  background:var(--color-glass);
+  border:1px solid var(--color-glass-edge);
+  display:flex;flex-direction:column;gap:10px;
+  transition:border-color 0.2s,transform 0.15s;
+}
+.skill-card:hover{border-color:rgba(123,200,228,0.25);transform:translateY(-1px)}
+.skill-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.skill-name{font-size:0.95rem;font-weight:600;color:var(--color-text)}
+.skill-source{
+  font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;
+  padding:2px 8px;border-radius:10px;
+  background:rgba(123,200,228,0.1);color:var(--color-primary);
+  flex-shrink:0;
+}
+.skill-source.hermes{background:rgba(123,200,228,0.12);color:var(--color-primary)}
+.skill-source.skillssh{background:rgba(123,200,164,0.12);color:var(--color-success)}
+.skill-source.github{background:rgba(196,169,125,0.12);color:var(--color-accent)}
+.skill-desc{font-size:0.8rem;color:var(--color-text-dim);line-height:1.4}
+.skill-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.skill-meta-item{font-size:0.7rem;color:var(--color-text-muted);display:flex;align-items:center;gap:4px}
+.skill-category{
+  font-size:0.6rem;padding:2px 8px;border-radius:10px;
+  background:rgba(90,106,128,0.2);color:var(--color-text-muted);
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.skill-downloads{font-size:0.7rem;color:var(--color-text-muted)}
+
+.security-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;
+  padding:3px 10px;border-radius:10px;
+}
+.security-badge.safe{background:rgba(123,200,164,0.15);color:var(--color-success)}
+.security-badge.warning{background:rgba(212,160,96,0.15);color:var(--color-warning)}
+.security-badge.dangerous{background:rgba(212,96,96,0.15);color:var(--color-alert)}
+.security-badge .sec-icon{font-size:0.7rem}
+
+.skill-actions{display:flex;gap:6px;margin-top:auto}
+.btn{
+  padding:6px 14px;border-radius:var(--radius-sm);
+  border:1px solid var(--color-glass-edge);
+  font-size:0.75rem;font-weight:500;font-family:inherit;
+  cursor:pointer;transition:all 0.2s;
+}
+.btn-install{background:rgba(123,200,228,0.12);color:var(--color-primary);border-color:rgba(123,200,228,0.3)}
+.btn-install:hover{background:rgba(123,200,228,0.22)}
+.btn-remove{background:rgba(212,96,96,0.1);color:var(--color-alert);border-color:rgba(212,96,96,0.3)}
+.btn-remove:hover{background:rgba(212,96,96,0.2)}
+.btn-scan{background:rgba(123,200,164,0.1);color:var(--color-success);border-color:rgba(123,200,164,0.3)}
+.btn-scan:hover{background:rgba(123,200,164,0.2)}
+.btn-update{background:rgba(196,169,125,0.12);color:var(--color-accent);border-color:rgba(196,169,125,0.3)}
+.btn-update:hover{background:rgba(196,169,125,0.22)}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+.two-col{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+.installed-panel,.history-panel{
+  border-radius:var(--radius);
+  background:var(--color-surface);
+  border:1px solid var(--color-glass-edge);
+  backdrop-filter:blur(24px);
+  overflow:hidden;
+}
+.panel-header{
+  padding:12px 16px;
+  border-bottom:1px solid var(--color-glass-edge);
+  font-size:0.7rem;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--color-text-muted);
+  font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.panel-body{padding:12px 16px;max-height:500px;overflow-y:auto}
+
+.installed-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--color-glass-edge);
+}
+.installed-item:last-child{border-bottom:none}
+.installed-info{flex:1;min-width:0}
+.installed-name{font-size:0.85rem;font-weight:500;color:var(--color-text)}
+.installed-details{font-size:0.7rem;color:var(--color-text-muted);display:flex;gap:8px;margin-top:2px}
+.installed-actions{display:flex;gap:4px;flex-shrink:0}
+.update-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--color-accent);
+  box-shadow:0 0 6px var(--color-accent);
+  flex-shrink:0;
+}
+
+.history-item{
+  padding:8px 0;
+  border-bottom:1px solid var(--color-glass-edge);
+  display:flex;align-items:flex-start;gap:10px;
+}
+.history-item:last-child{border-bottom:none}
+.history-icon{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;flex-shrink:0;margin-top:2px;
+}
+.history-icon.install{background:rgba(123,200,164,0.15);color:var(--color-success)}
+.history-icon.remove{background:rgba(212,96,96,0.15);color:var(--color-alert)}
+.history-icon.scan{background:rgba(123,200,228,0.15);color:var(--color-primary)}
+.history-icon.update{background:rgba(196,169,125,0.15);color:var(--color-accent)}
+.history-content{flex:1;min-width:0}
+.history-action{font-size:0.8rem;color:var(--color-text)}
+.history-action strong{color:var(--color-primary)}
+.history-time{font-size:0.65rem;color:var(--color-text-muted);margin-top:2px}
+.history-scan-badge{margin-left:4px}
+
+.scan-overlay{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;
+}
+.scan-overlay.visible{display:flex}
+.scan-dialog{
+  background:var(--color-surface);
+  border:1px solid var(--color-glass-edge);
+  border-radius:var(--radius);
+  padding:24px 28px;
+  min-width:380px;max-width:500px;
+  backdrop-filter:blur(24px);
+}
+.scan-dialog h3{font-size:1rem;color:var(--color-text);margin-bottom:16px}
+.scan-result{margin-bottom:16px}
+.scan-level{
+  display:flex;align-items:center;gap:8px;
+  font-size:1.1rem;font-weight:700;
+  margin-bottom:10px;
+}
+.scan-level.safe{color:var(--color-success)}
+.scan-level.warning{color:var(--color-warning)}
+.scan-level.dangerous{color:var(--color-alert)}
+.scan-score{font-size:0.8rem;color:var(--color-text-dim);margin-bottom:8px}
+.scan-checks{display:flex;flex-direction:column;gap:4px}
+.scan-check{
+  display:flex;align-items:center;gap:6px;
+  font-size:0.75rem;color:var(--color-text-dim);
+}
+.scan-check .check-icon{font-size:0.7rem}
+.scan-check.pass .check-icon{color:var(--color-success)}
+.scan-check.fail .check-icon{color:var(--color-alert)}
+.scan-message{
+  margin-top:10px;padding:8px 12px;
+  border-radius:var(--radius-sm);
+  background:var(--color-glass);
+  border:1px solid var(--color-glass-edge);
+  font-size:0.8rem;color:var(--color-text-dim);
+}
+.scan-close{
+  margin-top:16px;width:100%;
+  padding:8px;border-radius:var(--radius-sm);
+  border:1px solid var(--color-glass-edge);
+  background:var(--color-glass);
+  color:var(--color-text);
+  font-size:0.8rem;font-family:inherit;cursor:pointer;
+  transition:all 0.2s;
+}
+.scan-close:hover{background:rgba(123,200,228,0.12);border-color:rgba(123,200,228,0.3)}
+
+.empty-state{
+  text-align:center;padding:40px 20px;
+  color:var(--color-text-muted);font-size:0.85rem;
+}
+
+.toast{
+  position:fixed;bottom:20px;right:20px;z-index:300;
+  padding:10px 18px;border-radius:var(--radius-sm);
+  background:var(--color-surface);
+  border:1px solid var(--color-glass-edge);
+  color:var(--color-text);font-size:0.8rem;
+  backdrop-filter:blur(20px);
+  transform:translateY(20px);opacity:0;
+  transition:all 0.3s;pointer-events:none;
+}
+.toast.visible{transform:translateY(0);opacity:1}
+
+.loading-spinner{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid var(--color-glass-edge);
+  border-top-color:var(--color-primary);
+  border-radius:50%;animation:spin 0.6s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:900px){
+  .two-col{grid-template-columns:1fr}
+  .results-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="left">
+    <a href="/" class="ship-name" style="text-decoration:none">AGNETIC OS</a>
+    <span class="nav-link active" style="pointer-events:none">Marketplace</span>
+    <a href="/" class="nav-link">Dashboard</a>
+  </div>
+  <div class="right">
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<div id="main">
+  <div class="search-bar">
+    <input type="text" class="search-input" id="search-input" placeholder="Search skills, categories, authors...">
+    <select class="search-select" id="source-filter">
+      <option value="all">All Sources</option>
+      <option value="hermes">Hermes Registry</option>
+      <option value="skillssh">skills.sh</option>
+      <option value="github">GitHub</option>
+    </select>
+    <button class="search-btn" onclick="doSearch()">Search</button>
+  </div>
+
+  <div class="categories" id="categories"></div>
+
+  <div class="two-col">
+    <div>
+      <div class="section-label" style="margin-bottom:8px">Search Results</div>
+      <div class="results-grid" id="results-grid"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="installed-panel">
+        <div class="panel-header">
+          <span>Installed Skills</span>
+          <span id="installed-count" style="color:var(--color-primary)">0</span>
+        </div>
+        <div class="panel-body" id="installed-list"></div>
+      </div>
+
+      <div class="history-panel">
+        <div class="panel-header">
+          <span>Activity History</span>
+        </div>
+        <div class="panel-body" id="history-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scan-overlay" id="scan-overlay">
+  <div class="scan-dialog">
+    <h3>Security Scan</h3>
+    <div class="scan-result" id="scan-result"></div>
+    <button class="scan-close" onclick="closeScanDialog()">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CATEGORIES = ['devops','security','data','productivity','monitoring','automation','communication','analytics','infrastructure','ai'];
+let activeCategory = 'all';
+
+function updateClock(){
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = h+':'+m+':'+s;
+}
+updateClock();
+setInterval(updateClock,1000);
+
+function escapeHTML(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('visible'),2500);
+}
+
+function renderCategories(){
+  const el = document.getElementById('categories');
+  let html = '<button class="cat-btn active" data-cat="all" onclick="filterCategory(\'all\',this)">All</button>';
+  for(const c of CATEGORIES){
+    html += '<button class="cat-btn" data-cat="'+c+'" onclick="filterCategory(\''+c+'\',this)">'+escapeHTML(c)+'</button>';
+  }
+  el.innerHTML = html;
+}
+
+function filterCategory(cat, btn){
+  activeCategory = cat;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  doSearch();
+}
+
+async function doSearch(){
+  const q = document.getElementById('search-input').value.trim();
+  const source = document.getElementById('source-filter').value;
+  const params = new URLSearchParams();
+  if(q) params.set('q',q);
+  params.set('source',source);
+  if(activeCategory !== 'all') params.set('category',activeCategory);
+
+  const grid = document.getElementById('results-grid');
+  grid.innerHTML = '<div class="empty-state"><span class="loading-spinner"></span> Searching...</div>';
+
+  try{
+    const resp = await fetch('/api/marketplace/search?'+params);
+    const data = await resp.json();
+    renderResults(data.skills || []);
+  }catch(e){
+    grid.innerHTML = '<div class="empty-state">Search failed</div>';
+  }
+}
+
+function renderResults(skills){
+  const grid = document.getElementById('results-grid');
+  if(!skills.length){
+    grid.innerHTML = '<div class="empty-state">No skills found</div>';
+    return;
+  }
+  let html = '';
+  for(const s of skills){
+    const srcClass = s.source === 'hermes' ? 'hermes' : s.source === 'skillssh' ? 'skillssh' : 'github';
+    const srcLabel = s.source === 'skillssh' ? 'skills.sh' : s.source;
+    const dl = s.downloads >= 1000 ? (s.downloads/1000).toFixed(1)+'k' : s.downloads;
+    html += `<div class="skill-card">
+      <div class="skill-header">
+        <div>
+          <div class="skill-name">${escapeHTML(s.name)}</div>
+          <div class="skill-meta" style="margin-top:4px">
+            <span class="skill-source ${srcClass}">${escapeHTML(srcLabel)}</span>
+            <span class="skill-category">${escapeHTML(s.category)}</span>
+            <span class="security-badge ${s.security}"><span class="sec-icon">${s.security==='safe'?'&#10003;':s.security==='warning'?'&#9888;':'&#9760;'}</span>${escapeHTML(s.security)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="skill-desc">${escapeHTML(s.description)}</div>
+      <div class="skill-meta">
+        <span class="skill-meta-item">v${escapeHTML(s.version)}</span>
+        <span class="skill-meta-item">&#8595; ${dl}</span>
+        <span class="skill-meta-item">${escapeHTML(s.author)}</span>
+      </div>
+      <div class="skill-actions">
+        ${s.installed
+          ? '<button class="btn btn-remove" onclick="removeSkill(\''+s.id+'\')">Remove</button>'
+          : '<button class="btn btn-install" onclick="installSkill(\''+s.id+'\')">Install</button>'
+        }
+        <button class="btn btn-scan" onclick="scanSkill('${escapeHTML(s.id)}')">Scan</button>
+      </div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+async function installSkill(skillId){
+  toast('Installing '+skillId+'...');
+  try{
+    const resp = await fetch('/api/marketplace/install',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({skill_id:skillId})
+    });
+    const data = await resp.json();
+    if(data.error){
+      toast('Error: '+data.error);
+      return;
+    }
+    if(data.skill && data.skill.security_detail){
+      showScanDialog(skillId, data.skill.security_detail);
+    }
+    toast(skillId+' installed');
+    refreshInstalled();
+    doSearch();
+  }catch(e){
+    toast('Install failed');
+  }
+}
+
+async function removeSkill(skillId){
+  toast('Removing '+skillId+'...');
+  try{
+    const resp = await fetch('/api/marketplace/remove',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({skill_id:skillId})
+    });
+    const data = await resp.json();
+    if(data.error){toast('Error: '+data.error);return;}
+    toast(skillId+' removed');
+    refreshInstalled();
+    doSearch();
+  }catch(e){
+    toast('Remove failed');
+  }
+}
+
+async function scanSkill(skillId){
+  toast('Scanning '+skillId+'...');
+  try{
+    const resp = await fetch('/api/marketplace/scan',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({skill_id:skillId})
+    });
+    const data = await resp.json();
+    showScanDialog(skillId, data.scan);
+  }catch(e){
+    toast('Scan failed');
+  }
+}
+
+function showScanDialog(skillId, scan){
+  const el = document.getElementById('scan-result');
+  const icon = scan.level==='safe'?'&#10003;':scan.level==='warning'?'&#9888;':'&#9760;';
+  let checksHtml = '';
+  for(const c of scan.checks||[]){
+    const pass = !c.startsWith('no_');
+    const cls = c.startsWith('no_') ? 'pass' : 'fail';
+    const label = c.replace(/_/g,' ');
+    checksHtml += `<div class="scan-check ${cls}"><span class="check-icon">${cls==='pass'?'&#10003;':'&#10007;'}</span>${escapeHTML(label)}</div>`;
+  }
+  el.innerHTML = `
+    <div class="scan-level ${scan.level}">${icon} ${scan.level.toUpperCase()}</div>
+    <div class="scan-score">Confidence: ${scan.score}%</div>
+    <div class="scan-checks">${checksHtml}</div>
+    <div class="scan-message">${escapeHTML(scan.message)}</div>
+  `;
+  document.getElementById('scan-overlay').classList.add('visible');
+}
+
+function closeScanDialog(){
+  document.getElementById('scan-overlay').classList.remove('visible');
+}
+
+async function refreshInstalled(){
+  try{
+    const resp = await fetch('/api/marketplace/installed');
+    const data = await resp.json();
+    const list = document.getElementById('installed-list');
+    const count = document.getElementById('installed-count');
+    count.textContent = data.total || 0;
+    const items = data.installed || [];
+    if(!items.length){
+      list.innerHTML = '<div class="empty-state" style="padding:20px">No skills installed</div>';
+      return;
+    }
+    let html = '';
+    for(const s of items){
+      const hasUpdate = s.has_update;
+      html += `<div class="installed-item">
+        <div class="installed-info">
+          <div class="installed-name">${escapeHTML(s.name)} ${hasUpdate?'<span class="update-dot" title="Update available"></span>':''}</div>
+          <div class="installed-details">
+            <span>v${escapeHTML(s.version)}</span>
+            <span>${escapeHTML(s.source)}</span>
+            <span class="security-badge ${s.security}" style="padding:1px 6px;font-size:0.6rem">${escapeHTML(s.security)}</span>
+          </div>
+        </div>
+        <div class="installed-actions">
+          ${hasUpdate?'<button class="btn btn-update" onclick="installSkill(\''+s.id+'\')" style="font-size:0.65rem;padding:4px 8px">Update</button>':''}
+          <button class="btn btn-remove" onclick="removeSkill('${escapeHTML(s.id)}')" style="font-size:0.65rem;padding:4px 8px">Remove</button>
+        </div>
+      </div>`;
+    }
+    list.innerHTML = html;
+  }catch(e){}
+}
+
+async function refreshHistory(){
+  try{
+    const resp = await fetch('/api/marketplace/history');
+    const data = await resp.json();
+    const list = document.getElementById('history-list');
+    const items = data.history || [];
+    if(!items.length){
+      list.innerHTML = '<div class="empty-state" style="padding:20px">No activity yet</div>';
+      return;
+    }
+    let html = '';
+    for(const h of items){
+      const iconCls = h.action || 'install';
+      const icon = iconCls==='install'?'&#8594;':iconCls==='remove'?'&#10007;':iconCls==='scan'?'&#128269;':'&#8635;';
+      const time = h.timestamp ? new Date(h.timestamp).toLocaleString() : '';
+      let actionText = '';
+      if(h.action==='install') actionText = `Installed <strong>${escapeHTML(h.name||h.skill_id)}</strong> v${escapeHTML(h.version||'?')} from ${escapeHTML(h.source||'?')}`;
+      else if(h.action==='remove') actionText = `Removed <strong>${escapeHTML(h.name||h.skill_id)}</strong>`;
+      else if(h.action==='scan') actionText = `Scanned <strong>${escapeHTML(h.skill_id)}</strong>`;
+      else actionText = `${escapeHTML(h.action)} <strong>${escapeHTML(h.skill_id)}</strong>`;
+
+      const scanBadge = h.security ? `<span class="security-badge ${h.security} history-scan-badge" style="padding:1px 6px;font-size:0.55rem">${escapeHTML(h.security)}</span>` : '';
+
+      html += `<div class="history-item">
+        <div class="history-icon ${iconCls}">${icon}</div>
+        <div class="history-content">
+          <div class="history-action">${actionText}${scanBadge}</div>
+          <div class="history-time">${escapeHTML(time)}</div>
+        </div>
+      </div>`;
+    }
+    list.innerHTML = html;
+  }catch(e){}
+}
+
+document.getElementById('search-input').addEventListener('keydown',function(e){
+  if(e.key==='Enter') doSearch();
+});
+
+document.getElementById('scan-overlay').addEventListener('click',function(e){
+  if(e.target===this) closeScanDialog();
+});
+
+renderCategories();
+doSearch();
+refreshInstalled();
+refreshHistory();
+setInterval(()=>{refreshInstalled();refreshHistory();},5000);
+</script>
+</body>
+</html>
