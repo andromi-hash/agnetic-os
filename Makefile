@@ -1,4 +1,6 @@
 SHELL := /bin/bash
+CARGO := $(HOME)/.cargo/bin/cargo
+GO := /tmp/go/bin/go
 export PATH := /tmp/go/bin:$(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 
 .PHONY: all build build-agent cli install uninstall run dev stop clean status
@@ -7,10 +9,10 @@ all: build build-agent
 
 # ─── Build ──────────────────────────────────────────────────────────
 build:
-	cd agneticctl && go build -o agneticctl .
+	cd agneticctl && $(GO) build -o agneticctl .
 
 build-agent:
-	cd agent && cargo build --release
+	cd agent && $(CARGO) build --release
 
 cli: build
 	cp agneticctl/agneticctl ~/.local/bin/agneticctl
