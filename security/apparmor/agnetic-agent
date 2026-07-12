@@ -1,0 +1,64 @@
+# vim:syntax=apparmor
+# Profile for Agnetic OS agent daemons
+
+#include <tunables/global>
+
+profile agnetic-agent /opt/agnetic/bin/* {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+
+  # Binary and library access
+  /opt/agnetic/**               r,
+  /opt/agnetic/bin/*            ix,
+
+  # Agent configuration
+  /etc/agnetic/**               r,
+
+  # Runtime directories
+  /tmp/**                       rw,
+  /var/log/agnetic/**           rw,
+  /var/run/agnetic/**           rw,
+
+  # System libraries
+  /lib/**                       r,
+  /lib64/**                     r,
+  /usr/lib/**                   r,
+  /usr/share/**                 r,
+  /etc/ld.so.cache              r,
+  /etc/ld.so.preload            r,
+  /etc/locale/**                r,
+  /etc/localtime                r,
+  /proc/sys/net/core/somaxconn  r,
+  /proc/version                 r,
+
+  # Proc filesystem (limited)
+  /proc/self/**                 r,
+
+  # TCP connections to localhost (NATS, Ollama)
+  network inet stream,
+  network inet6 stream,
+
+  # Deny raw sockets
+  deny network raw,
+  deny network packet,
+
+  # Deny dangerous capabilities
+  deny capability sys_module,
+  deny capability sys_rawio,
+  deny capability sys_ptrace,
+  deny capability sys_admin,
+
+  # Deny mount operations
+  deny mount,
+  deny umount,
+  deny pivot_root,
+
+  # Deny write to sensitive paths
+  deny /home/**                 w,
+  deny /root/**                 w,
+  deny /etc/**                  w,
+  allow /etc/agnetic/**         rw,
+
+  # Deny accessing other users' data
+  deny /var/lib/**              w,
+}

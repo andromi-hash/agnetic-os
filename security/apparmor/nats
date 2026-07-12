@@ -1,0 +1,77 @@
+# vim:syntax=apparmor
+# Profile for NATS messaging server
+
+#include <tunables/global>
+
+profile nats /usr/local/bin/nats-server {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+
+  # Binary and library access
+  /usr/local/bin/nats-server     rix,
+  /usr/lib/nats/**               r,
+
+  # Configuration
+  /etc/agnetic/nats/**           r,
+  allow /etc/agnetic/nats/**     rw,
+
+  # Data storage
+  /var/lib/agnetic/nats/**       rw,
+  /var/lib/agnetic/nats/data/**  rw,
+
+  # Logs
+  /var/log/agnetic/**            rw,
+
+  # Runtime
+  /tmp/**                        rw,
+  /var/run/agnetic/nats/**       rw,
+
+  # System libraries
+  /lib/**                        r,
+  /lib64/**                      r,
+  /usr/lib/**                    r,
+  /usr/share/**                  r,
+  /etc/ld.so.cache               r,
+  /etc/ld.so.preload             r,
+  /etc/locale/**                 r,
+  /etc/localtime                 r,
+  /proc/version                  r,
+  /proc/sys/net/core/somaxconn   r,
+
+  # Proc filesystem (limited)
+  /proc/self/**                  r,
+
+  # TCP/UDP on configured ports (4222 client, 6222 routing, 8222 monitoring)
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+
+  # Deny raw sockets
+  deny network raw,
+  deny network packet,
+
+  # Deny dangerous capabilities
+  deny capability sys_module,
+  deny capability sys_rawio,
+  deny capability sys_ptrace,
+  deny capability sys_admin,
+
+  # Deny mount operations
+  deny mount,
+  deny umount,
+  deny pivot_root,
+
+  # Deny write to home and sensitive paths
+  deny /home/**                  w,
+  deny /root/**                  w,
+  deny /etc/**                   w,
+  allow /etc/agnetic/nats/**     rw,
+
+  # Deny ptrace
+  deny ptrace (read, trace),
+
+  # Deny kernel module operations
+  deny /sys/module/**            w,
+  deny /sys/firmware/**          w,
+}

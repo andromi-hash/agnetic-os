@@ -7,6 +7,7 @@ import json
 import asyncio
 import logging
 import subprocess
+import uuid
 from pathlib import Path
 from datetime import datetime
 from aiohttp import web
@@ -311,6 +312,263 @@ async def handle_history(request):
     return web.json_response({"messages": results, "total": len(results)})
 
 
+async def stream_ollama(model, messages, on_token=None):
+    """Stream a response from Ollama, yielding tokens via callback."""
+    import aiohttp as _aiohttp
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+    }
+    full_response = ""
+    async with _aiohttp.ClientSession() as session:
+        async with session.post(f"{OLLAMA_URL}/api/chat", json=payload) as resp:
+            if resp.status != 200:
+                body = await resp.text()
+                raise RuntimeError(f"Ollama error {resp.status}: {body}")
+            async for line in resp.content:
+                line = line.decode().strip()
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                token = chunk.get("message", {}).get("content", "")
+                if token:
+                    full_response += token
+                    if on_token:
+                        await on_token(token)
+                if chunk.get("done"):
+                    break
+    return full_response
+
+
+TOOL_DEFINITIONS = {
+    "shell": {
+        "description": "Execute a shell command and return output",
+        "params": ["command"],
+    },
+    "read_file": {
+        "description": "Read a file from disk",
+        "params": ["path"],
+    },
+    "write_file": {
+        "description": "Write content to a file",
+        "params": ["path", "content"],
+    },
+    "list_dir": {
+        "description": "List directory contents",
+        "params": ["path"],
+    },
+}
+
+
+def build_system_prompt(agent_name):
+    """Build a system prompt for the given agent."""
+    tool_desc = "\n".join(
+        f"- {name}: {info['description']} (params: {', '.join(info['params'])})"
+        for name, info in TOOL_DEFINITIONS.items()
+    )
+    return (
+        f"You are {agent_name}, an AI agent in the Agnetic OS system.\n"
+        f"You have access to these tools:\n{tool_desc}\n\n"
+        "To use a tool, output a JSON block on its own line:\n"
+        '{"tool": "shell", "args": {"command": "ls -la"}}\n\n'
+        "After receiving tool results, provide your final response.\n"
+        "Keep responses concise and helpful."
+    )
+
+
+def extract_tool_calls(text):
+    """Extract JSON tool calls from agent text output."""
+    calls = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("{") and line.endswith("}"):
+            try:
+                obj = json.loads(line)
+                if "tool" in obj:
+                    calls.append(obj)
+            except json.JSONDecodeError:
+                continue
+    return calls
+
+
+async def execute_tool(tool_name, tool_args):
+    """Execute a tool locally and return the result."""
+    if tool_name == "shell":
+        cmd = tool_args.get("command", "echo 'no command'")
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+            return stdout.decode(errors="replace")[:4000]
+        except asyncio.TimeoutError:
+            return "Error: command timed out after 30s"
+        except Exception as e:
+            return f"Error: {e}"
+    elif tool_name == "read_file":
+        path = tool_args.get("path", "")
+        try:
+            return Path(path).read_text(errors="replace")[:4000]
+        except Exception as e:
+            return f"Error reading {path}: {e}"
+    elif tool_name == "write_file":
+        path = tool_args.get("path", "")
+        content = tool_args.get("content", "")
+        try:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(content)
+            return f"Written {len(content)} bytes to {path}"
+        except Exception as e:
+            return f"Error writing {path}: {e}"
+    elif tool_name == "list_dir":
+        path = tool_args.get("path", ".")
+        try:
+            entries = sorted(Path(path).iterdir())
+            return "\n".join(
+                f"{'d' if e.is_dir() else 'f'} {e.name}" for e in entries[:200]
+            )
+        except Exception as e:
+            return f"Error listing {path}: {e}"
+    else:
+        return f"Unknown tool: {tool_name}"
+
+
+async def process_command(agent, command, args, callbacks):
+    """
+    Run the agent loop: send prompt to Ollama, parse tool calls, execute them,
+    feed results back, repeat until the agent produces a final text response.
+
+    callbacks dict keys: on_tool_start, on_tool_complete, on_step, on_token, on_response, on_error
+    """
+    on_tool_start = callbacks.get("on_tool_start", lambda **kw: asyncio.sleep(0))
+    on_tool_complete = callbacks.get("on_tool_complete", lambda **kw: asyncio.sleep(0))
+    on_step = callbacks.get("on_step", lambda **kw: asyncio.sleep(0))
+    on_token = callbacks.get("on_token", lambda **kw: asyncio.sleep(0))
+    on_response = callbacks.get("on_response", lambda **kw: asyncio.sleep(0))
+    on_error = callbacks.get("on_error", lambda **kw: asyncio.sleep(0))
+
+    model_map = {
+        "proxy": "qwen2.5:7b",
+        "romi": "qwen2.5:7b",
+        "ergo": "jeffgreen311/eve-v2-unleashed-qwen3.5-8b-liberated-4b-4b-merged",
+    }
+    model = model_map.get(agent, "qwen2.5:7b")
+
+    user_content = command
+    if args:
+        user_content += " " + json.dumps(args)
+
+    messages = [
+        {"role": "system", "content": build_system_prompt(agent)},
+        {"role": "user", "content": user_content},
+    ]
+
+    max_iterations = 5
+    for step_num in range(1, max_iterations + 1):
+        await on_step(step=step_num, max_steps=max_iterations)
+
+        try:
+            full_text = await stream_ollama(
+                model, messages, on_token=on_token
+            )
+        except Exception as e:
+            await on_error(error=str(e))
+            return
+
+        tool_calls = extract_tool_calls(full_text)
+        if not tool_calls:
+            await on_response(text=full_text)
+            return
+
+        messages.append({"role": "assistant", "content": full_text})
+
+        for call in tool_calls:
+            tool_name = call["tool"]
+            tool_args = call.get("args", {})
+            await on_tool_start(tool=tool_name, args=tool_args)
+
+            result = await execute_tool(tool_name, tool_args)
+            summary = result[:200] + ("..." if len(result) > 200 else "")
+            await on_tool_complete(tool=tool_name, summary=f"Output: {summary}")
+
+            messages.append({
+                "role": "user",
+                "content": f"Tool result ({tool_name}):\n{result}",
+            })
+
+    await on_response(text="[max iterations reached]")
+
+
+async def handle_chat_stream(request):
+    """SSE endpoint: POST /api/chat/stream with {agent, command, args}."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid JSON body"}, status=400)
+
+    agent = body.get("agent", "proxy")
+    command = body.get("command", "ping")
+    args = body.get("args", {})
+
+    response = web.StreamResponse(
+        status=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+    await response.prepare(request)
+
+    async def send_sse(event, data):
+        payload = f"event: {event}\ndata: {json.dumps(data)}\n\n"
+        try:
+            await response.write(payload.encode())
+        except (ConnectionResetError, RuntimeError):
+            pass
+
+    async def on_tool_start(tool, args):
+        await send_sse("tool_start", {"tool": tool, "args": args})
+
+    async def on_tool_complete(tool, summary):
+        await send_sse("tool_complete", {"tool": tool, "summary": summary})
+
+    async def on_step(step, max_steps):
+        await send_sse("step", {"step": step, "max_steps": max_steps})
+
+    async def on_token(token):
+        await send_sse("token", {"text": token})
+
+    async def on_response(text):
+        await send_sse("response", {"text": text})
+
+    async def on_error(error):
+        await send_sse("error", {"error": error})
+
+    await process_command(
+        agent, command, args,
+        callbacks={
+            "on_tool_start": on_tool_start,
+            "on_tool_complete": on_tool_complete,
+            "on_step": on_step,
+            "on_token": on_token,
+            "on_response": on_response,
+            "on_error": on_error,
+        },
+    )
+
+    await send_sse("done", {"id": str(uuid.uuid4())})
+    await response.write_eof()
+    return response
+
+
 async def handle_health(request):
     agent_status = await get_agent_process_status()
     nats_ok = False
@@ -340,6 +598,7 @@ app.router.add_post("/api/ollama/delete", handle_api_ollama_delete)
 app.router.add_get("/api/logs", handle_logs)
 app.router.add_get("/api/history", handle_history)
 app.router.add_post("/api/send", handle_send)
+app.router.add_post("/api/chat/stream", handle_chat_stream)
 app.router.add_get("/api/health", handle_health)
 
 

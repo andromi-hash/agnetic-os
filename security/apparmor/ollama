@@ -1,0 +1,89 @@
+# vim:syntax=apparmor
+# Profile for Ollama LLM runtime
+
+#include <tunables/global>
+
+profile ollama /usr/bin/ollama {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+
+  # Binary and library access
+  /usr/bin/ollama               rix,
+  /usr/lib/ollama/**            r,
+
+  # Ollama data and model storage
+  /usr/share/ollama/**          r,
+  /usr/local/share/ollama/**    r,
+
+  # Model storage (default location)
+  /var/lib/ollama/**            rw,
+  /var/lib/ollama/models/**     r,
+
+  # Configuration
+  /etc/ollama/**                r,
+  allow /etc/ollama/**          rw,
+
+  # Runtime and scratch space
+  /tmp/**                       rw,
+
+  # Logs
+  /var/log/ollama/**            rw,
+
+  # System libraries
+  /lib/**                       r,
+  /lib64/**                     r,
+  /usr/lib/**                   r,
+  /usr/share/**                 r,
+  /etc/ld.so.cache              r,
+  /etc/ld.so.preload            r,
+  /etc/locale/**                r,
+  /etc/localtime                r,
+  /proc/sys/fs/file-max         r,
+  /proc/version                 r,
+
+  # Proc filesystem (limited)
+  /proc/self/**                 r,
+  /proc/meminfo                 r,
+  /proc/cpuinfo                 r,
+
+  # GPU access - NVIDIA
+  /dev/nvidia*                  rw,
+  /dev/dri/*                    rw,
+
+  # GPU libraries
+  /usr/lib/x86_64-linux-gnu/libnvidia*    r,
+  /usr/lib/x86_64-linux-gnu/libcuda*      r,
+  /usr/lib/x86_64-linux-gnu/libnvcuvid*   r,
+  /usr/local/cuda/**                        r,
+  /usr/local/cuda/lib64/**                  r,
+
+  # TCP connections on localhost
+  network inet stream,
+  network inet6 stream,
+
+  # Deny raw sockets
+  deny network raw,
+  deny network packet,
+
+  # Deny dangerous capabilities
+  deny capability sys_module,
+  deny capability sys_rawio,
+  deny capability sys_ptrace,
+  deny capability sys_admin,
+
+  # Deny mount operations
+  deny mount,
+  deny umount,
+  deny pivot_root,
+
+  # Deny write to home and sensitive paths
+  deny /home/**                 w,
+  deny /etc/**                  w,
+
+  # Deny ptrace
+  deny ptrace (read, trace),
+
+  # Deny kernel module operations
+  deny /sys/module/**           w,
+  deny /sys/firmware/**         w,
+}

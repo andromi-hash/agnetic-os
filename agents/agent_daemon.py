@@ -44,24 +44,110 @@ def load_agent_config(name):
         return yaml.safe_load(f)
 
 
-async def query_ollama(model, prompt, system=None):
-    """Send a prompt to Ollama and return the response."""
+async def query_ollama(model, prompt, system=None, tools=None, nats=None, max_tool_rounds=10, callbacks=None):
+    """Send a prompt to Ollama with optional tool calling loop.
+
+    Borrowed patterns from Hermes Agent:
+    - Tool call auto-repair for malformed JSON
+    - Callback-driven streaming for real-time progress
+    - Buffered status for retry noise
+
+    If tools are provided, uses Ollama's chat API with tool definitions.
+    Loops: send prompt → Ollama calls tool → execute → feed result back → repeat.
+    Stops when Ollama returns text (no more tool calls) or max rounds hit.
+    """
     import httpx
-    
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.3},
-    }
+    from tools import get_tool_definitions, execute_tool, repair_tool_arguments
+
+    callbacks = callbacks or {}
+    messages = []
     if system:
-        payload["system"] = system
-    
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
-        resp.raise_for_status()
-        result = resp.json()
-        return result.get("response", "")
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    if not tools:
+        # Simple generate (no tool calling)
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.3},
+        }
+        if system:
+            payload["system"] = system
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
+            resp.raise_for_status()
+            return resp.json().get("response", "")
+
+    # Tool-calling loop via chat API (Hermes pattern)
+    tool_defs = get_tool_definitions("full")
+    status_buffer = []  # Hermes: buffered status for retry noise
+
+    for round_num in range(max_tool_rounds):
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "tools": tool_defs,
+            "options": {"temperature": 0.3},
+        }
+
+        # Emit step callback (Hermes pattern)
+        if "step" in callbacks:
+            callbacks["step"](round_num, max_tool_rounds)
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
+                resp.raise_for_status()
+                result = resp.json()
+        except Exception as e:
+            # Buffer error, retry once
+            status_buffer.append(("error", str(e)))
+            log.warning("Ollama request failed (round %d): %s", round_num, e)
+            await asyncio.sleep(1)
+            continue
+
+        message = result.get("message", {})
+        tool_calls = message.get("tool_calls", [])
+
+        # No tool calls → return final text response
+        if not tool_calls:
+            content = message.get("content", "")
+            # Flush status buffer on success (Hermes pattern)
+            if status_buffer and "status" in callbacks:
+                for kind, text in status_buffer:
+                    callbacks["status"](kind, text)
+            return content
+
+        # Append assistant message
+        messages.append(message)
+
+        # Execute each tool call with auto-repair (Hermes pattern)
+        for tc in tool_calls:
+            func = tc.get("function", {})
+            tool_name = func.get("name", "")
+            tool_args_raw = func.get("arguments", {})
+
+            # Auto-repair malformed arguments
+            tool_args = repair_tool_arguments(tool_args_raw, tool_name)
+
+            log.info("Tool call: %s(%s)", tool_name, json.dumps(tool_args)[:200])
+
+            if "tool_progress" in callbacks:
+                callbacks["tool_progress"](tool_name, tool_args, "starting")
+
+            tool_result = await execute_tool(tool_name, tool_args, nats=nats, callbacks=callbacks)
+            log.info("Tool result: %s", json.dumps(tool_result)[:300])
+
+            if "tool_progress" in callbacks:
+                callbacks["tool_progress"](tool_name, tool_result, "complete")
+
+            messages.append({"role": "tool", "content": json.dumps(tool_result)})
+
+    # Max rounds hit
+    return f"[Tool loop completed after {max_tool_rounds} rounds]"
 
 
 async def ensure_model(model):
@@ -140,7 +226,7 @@ def load_soul(agent_name):
     return None
 
 
-async def process_command(agent_name, config, subject, payload, telemetry=None):
+async def process_command(agent_name, config, subject, payload, telemetry=None, nats=None, use_tools=True):
     """Process a single command and return the result."""
     model = config.get("model", "qwen2.5:7b")
     role = config.get("role", "assistant")
@@ -215,8 +301,8 @@ async def process_command(agent_name, config, subject, payload, telemetry=None):
         user_prompt += f"Arguments: {json.dumps(args, indent=2)}\n"
     user_prompt += "\nProvide your response."
     
-    log.info("Processing command '%s' for agent '%s'", command, agent_name)
-    response = await query_ollama(model, user_prompt, system=system_prompt)
+    log.info("Processing command '%s' for agent '%s' (tools=%s)", command, agent_name, use_tools)
+    response = await query_ollama(model, user_prompt, system=system_prompt, tools=use_tools, nats=nats)
     log.info("Response received (%d chars) for '%s'", len(response), command)
     return response
 
@@ -292,7 +378,7 @@ async def run_agent(agent_name, model_override=None):
                     "timestamp": datetime.now().isoformat(),
                 }).encode())
                 
-                response = await process_command(agent_name, config, subject, data, telemetry_cache)
+                response = await process_command(agent_name, config, subject, data, telemetry_cache, nats=nc, use_tools=True)
                 
                 # Publish response to status (for simple replies) or a reply subject
                 status_payload = json.dumps({
