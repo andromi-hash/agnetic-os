@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 export PATH := /tmp/go/bin:$(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 
 .PHONY: all build build-agent cli install uninstall run dev stop clean status
