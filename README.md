@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **This repository is archived (Alpha 2.0).**
+>
+> Development continues at **[andromi-hash/starship-os](https://github.com/andromi-hash/starship-os)** as **Starship OS** Alpha 2.1+.
+> Please open issues and PRs there. Tags and history here remain for reference.
+
+---
+
 # Agnetic Starship OS
 
 **An AI agent-first operating system built on Ubuntu 24.04 LTS**
